@@ -3,6 +3,7 @@ import detect
 import solve
 import cv2
 import numpy
+import gui
 
 def main():
     settings = pipeline.CameraSettings(
@@ -31,10 +32,11 @@ def main():
     while True:
         retval, image = capture.read_frame()
         if retval:
-            cv2.imshow("capture", image)
             results = detector.detect(image)
             for detection in results:
                 print(estimator.estimate_pose(detection))
+            gui.overlay_image_observation(image, results)
+            cv2.imshow("capture", image)
         else:
             print("did not get image")
         
