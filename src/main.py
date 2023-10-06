@@ -4,8 +4,10 @@ import solve
 import cv2
 import numpy
 import gui
+import environment
 
 def main():
+    env = environment.TagEnvironment("environment.json")
     settings = pipeline.CameraSettings(
         opencv_id=0,
         resolution=[640, 480],
@@ -17,6 +19,7 @@ def main():
     detector = detect.TagDetector(cv2.aruco.DICT_APRILTAG_16H5)
     estimator = solve.PoseEstimator(
         tag_size=0.15301, # Tag outer size in meters
+        env=env,
 
         # Make up some arbitrary calibration data (very wrong)
         calibration=solve.CalibrationInfo(
@@ -33,8 +36,7 @@ def main():
         retval, image = capture.read_frame()
         if retval:
             results = detector.detect(image)
-            for detection in results:
-                print(estimator.estimate_pose(detection))
+            print(estimator.estimate_pose(results))
             gui.overlay_image_observation(image, results)
             cv2.imshow("capture", image)
         else:
