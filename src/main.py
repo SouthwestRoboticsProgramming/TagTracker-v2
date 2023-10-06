@@ -1,6 +1,7 @@
 import pipeline
 import detect
 import cv2
+import gui
 
 def main():
     settings = pipeline.CameraSettings(
@@ -16,8 +17,10 @@ def main():
     while True:
         retval, image = capture.read_frame()
         if retval:
+            results = detector.detect(image)
+            print(results)
+            gui.overlay_image_observation(image, results)
             cv2.imshow("capture", image)
-            print(detector.detect(image))
         else:
             print("did not get image")
         
