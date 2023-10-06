@@ -17,7 +17,7 @@ def main():
         retval, image = capture.read_frame()
         if retval:
             cv2.imshow("capture", image)
-            detector.detect(image)
+            print(detector.detect(image))
         else:
             print("did not get image")
         

@@ -1,4 +1,12 @@
 import cv2
+import numpy
+import numpy.typing
+from dataclasses import dataclass
+
+@dataclass
+class DetectedTag:
+    id: int
+    corners: numpy.typing.NDArray[numpy.float64]
 
 class TagDetector:
     def __init__(self, dictionary):
@@ -10,4 +18,5 @@ class TagDetector:
         corners, ids, _ = self.detector.detectMarkers(image)
         if len(corners) == 0:
             return []
-        print("corners", corners, " ids", ids)
+        return [DetectedTag(id[0], corner) for id, corner in zip(ids, corners)]
+
