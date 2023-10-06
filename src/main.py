@@ -1,4 +1,5 @@
 import pipeline
+import detect
 import cv2
 
 def main():
@@ -10,11 +11,13 @@ def main():
         gain=10
     )
     capture = pipeline.Capture(settings)
+    detector = detect.TagDetector(cv2.aruco.DICT_APRILTAG_16H5)
 
     while True:
         retval, image = capture.read_frame()
         if retval:
             cv2.imshow("capture", image)
+            detector.detect(image)
         else:
             print("did not get image")
         
