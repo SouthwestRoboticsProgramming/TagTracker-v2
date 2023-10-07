@@ -53,6 +53,9 @@ class TagTrackerPipeline:
         self.running = True
 
     def run(self, gui_images: dict[str, cv2.Mat]):
+        fps = 0
+        fps_count = 0
+        fps_start = time.time()
         while self.running:
             frame_timestamp = time.time()
             retval, image = self.capture.read_frame()
@@ -62,12 +65,19 @@ class TagTrackerPipeline:
 
             results = self.detector.detect(image)
             estimation = self.estimator.estimate_pose(results)
-            self.io.publish_estimations(estimation, frame_timestamp)
+
+            fps_count += 1
+            if frame_timestamp - fps_start > 1:
+                fps_start += 1
+                fps = fps_count
+                fps_count = 0
+
+            self.io.publish_data(estimation, frame_timestamp, fps)
 
             print(self.name + ":", estimation)
 
             if self.enable_gui:
                 gui.overlay_image_observation(image, results)
+                gui.overlay_frame_rate(image, fps)
                 gui_images["Capture: " + self.name] = image
-                # cv2.imshow("Capture: " + self.name, image)
                 

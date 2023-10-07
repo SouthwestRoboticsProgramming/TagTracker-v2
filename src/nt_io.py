@@ -22,11 +22,12 @@ class NetworkTablesIO:
     def __init__(self, camera_name: str):
         # Get NT publisher
         inst = ntcore.NetworkTableInstance.getDefault()
-        table = inst.getTable("/TagTracker/cameras")
-        self.poses_pub = table.getDoubleArrayTopic(camera_name).publish(
+        table = inst.getTable("/TagTracker/Cameras/" + camera_name)
+        self.poses_pub = table.getDoubleArrayTopic("poses").publish(
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
+        self.fps_pub = table.getDoubleTopic("fps").publish()
 
-    def publish_estimations(self, estimation: solve.PoseEstimation, timestamp: float) -> None:
+    def publish_data(self, estimation: solve.PoseEstimation, timestamp: float, fps: float) -> None:
         # Collect the pose data into an array
         pose_data = [0]
         if estimation:
@@ -41,3 +42,4 @@ class NetworkTablesIO:
         # Send it
         # Set the entry's timestamp so robot code knows when frame was captured
         self.poses_pub.set(pose_data, math.floor(timestamp * 1000000))
+        self.fps_pub.set(fps)
