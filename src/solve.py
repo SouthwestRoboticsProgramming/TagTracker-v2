@@ -38,8 +38,8 @@ def wpiToCv(tx: Translation3d) -> list[float]:
     return [-tx.Y(), -tx.Z(), tx.X()]
 
 class PoseEstimator:
-    def __init__(self, tag_size, calibration: CalibrationInfo, env: environment.TagEnvironment):
-        self.tag_size = tag_size
+    def __init__(self, calibration: CalibrationInfo, env: environment.TagEnvironment):
+        self.tag_size = env.tag_size
         self.calibration = calibration
         self.env = env
 

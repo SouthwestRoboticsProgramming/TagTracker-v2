@@ -2,6 +2,7 @@ from wpimath.geometry import *
 import json
 
 class TagEnvironment:
+    tag_size: float
     tags: dict[int, Pose3d]
 
     def __init__(self, json_file_name):
@@ -9,6 +10,7 @@ class TagEnvironment:
         json_obj = json.load(json_file)
         
         self.tags = {}
+        self.tag_size = json_obj["tag_size"]
         json_tags = json_obj["tags"]
         for json_tag in json_tags:
             id = json_tag["ID"]

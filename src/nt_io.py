@@ -1,7 +1,6 @@
 import ntcore
 import solve
 import math
-import environment
 from wpimath.geometry import *
 
 def append_pose(pose_data: list[float], pose: Pose3d):
@@ -20,23 +19,12 @@ def append_estimate(pose_data: list[float], est: tuple[Pose3d, float]):
     append_pose(pose_data, pose)
 
 class NetworkTablesIO:
-    def __init__(self, server_ip: str, client_name: str, env: environment.TagEnvironment):
+    def __init__(self, camera_name: str):
+        # Get NT publisher
         inst = ntcore.NetworkTableInstance.getDefault()
-        inst.setServer(server_ip)
-        inst.startClient4(client_name)
-
-        # Get NT publishers
-        table = inst.getTable("/TagTracker/" + client_name)
-        self.poses_pub = table.getDoubleArrayTopic("poses").publish(
+        table = inst.getTable("/TagTracker/cameras")
+        self.poses_pub = table.getDoubleArrayTopic(camera_name).publish(
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
-        self.env_pub = table.getDoubleArrayTopic("environment").publish()
-
-        # Publish the tag environment so ShuffleLog can visualize it
-        env_data = []
-        for id, pose in env.tags.items():
-            env_data.append(id)
-            append_pose(env_data, pose)
-        self.env_pub.set(env_data)
 
     def publish_estimations(self, estimation: solve.PoseEstimation, timestamp: float) -> None:
         # Collect the pose data into an array
