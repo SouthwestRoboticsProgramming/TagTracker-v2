@@ -29,14 +29,14 @@ class NetworkTablesIO:
         table = inst.getTable("/TagTracker/" + client_name)
         self.poses_pub = table.getDoubleArrayTopic("poses").publish(
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
-        env_pub = table.getDoubleArrayTopic("environment").publish()
+        self.env_pub = table.getDoubleArrayTopic("environment").publish()
 
         # Publish the tag environment so ShuffleLog can visualize it
         env_data = []
         for id, pose in env.tags.items():
             env_data.append(id)
             append_pose(env_data, pose)
-        env_pub.set(env_data)
+        self.env_pub.set(env_data)
 
     def publish_estimations(self, estimation: solve.PoseEstimation, timestamp: float) -> None:
         # Collect the pose data into an array

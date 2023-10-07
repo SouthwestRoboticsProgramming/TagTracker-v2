@@ -11,7 +11,7 @@ import nt_io
 def main():
     env = environment.TagEnvironment("environment.json")
     settings = pipeline.CameraSettings(
-        opencv_id=0,
+        opencv_id=2,
         resolution=[640, 480],
         auto_exposure=3,
         exposure=0.01,
@@ -43,7 +43,7 @@ def main():
         if retval:
             results = detector.detect(image)
             estimation = estimator.estimate_pose(results)
-            print(estimation)
+            # print(estimation)
 
             gui.overlay_image_observation(image, results)
             io.publish_estimations(estimation, frame_timestamp)
