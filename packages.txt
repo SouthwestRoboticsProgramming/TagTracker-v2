@@ -1,6 +1,0 @@
-TODO: Mason make this into requirements.txt
-
-numpy
-pyntcore
-robotpy-wpimath
-opencv-contrib-python
