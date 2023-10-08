@@ -74,7 +74,7 @@ class TagTrackerPipeline:
 
             self.io.publish_data(estimation, frame_timestamp, fps)
 
-            print(self.name + ":", estimation)
+            print(f"{self.name} : {estimation}")
 
             if self.enable_gui:
                 gui.overlay_image_observation(image, results)
