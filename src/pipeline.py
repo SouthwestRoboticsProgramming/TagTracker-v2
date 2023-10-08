@@ -63,7 +63,7 @@ class TagTrackerPipeline:
             frame_timestamp = time.time()
             retval, image = self.capture.read_frame()
             if not retval:
-                # print("did not get image")
+                print(f"Did not receive image from {self.name}")
                 continue
 
             results = self.detector.detect(image)
@@ -78,7 +78,7 @@ class TagTrackerPipeline:
             self.io.publish_data(estimation, frame_timestamp, fps)
 
             # if estimation:
-            #     print(self.name + ":", estimation)
+            #     print(f"{self.name} : {estimation}")
 
             if self.enable_gui:
                 gui.overlay_image_observation(image, results)
