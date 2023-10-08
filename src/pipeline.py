@@ -60,7 +60,7 @@ class TagTrackerPipeline:
             frame_timestamp = time.time()
             retval, image = self.capture.read_frame()
             if not retval:
-                print("did not get image")
+                print(f"Did not receive image from {self.name}")
                 continue
 
             results = self.detector.detect(image)
