@@ -59,6 +59,7 @@ class TagTrackerPipeline:
         fps = 0
         fps_count = 0
         fps_start = time.time()
+        print("Capture started:", self.name)
         while self.running:
             frame_timestamp = time.time()
             retval, image = self.capture.read_frame()

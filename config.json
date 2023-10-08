@@ -1,0 +1,27 @@
+{
+    "environment": "environment.json",
+    "networktables": {
+        "server-ip": "localhost",
+        "identity": "TagTracker-v2"
+    },
+    "log-outputs": true,
+    "tag-family": "16h5",
+    "cameras": [
+        {
+            "id": 0,
+            "name": "laptop",
+            "calibration": "calibrations/hp_probook_11_g2_webcam.json",
+            "auto-exposure": 3,
+            "exposure": 0.01,
+            "gain": 1
+        },
+        {
+            "id": 2,
+            "name": "usb",
+            "calibration": "calibrations/logitech_c250.json",
+            "auto-exposure": 3,
+            "exposure": 0.01,
+            "gain": 1
+        }
+    ]
+}
