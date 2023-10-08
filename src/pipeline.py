@@ -5,6 +5,7 @@ import nt_io
 import detect
 import time
 import gui
+import output_logger
 from dataclasses import dataclass
 
 @dataclass
@@ -22,6 +23,7 @@ class PipelineSettings:
     calibration: solve.CalibrationInfo
     dictionary_id: int
     enable_gui: bool = False
+    logger: output_logger.OutputLogger = None
 
 class Capture:
     video: cv2.VideoCapture
@@ -49,6 +51,7 @@ class TagTrackerPipeline:
         self.io = nt_io.NetworkTablesIO(settings.name)
         self.name = settings.name
         self.enable_gui = settings.enable_gui
+        self.logger = settings.logger
 
         self.running = True
 
@@ -60,7 +63,7 @@ class TagTrackerPipeline:
             frame_timestamp = time.time()
             retval, image = self.capture.read_frame()
             if not retval:
-                print("did not get image")
+                # print("did not get image")
                 continue
 
             results = self.detector.detect(image)
@@ -74,10 +77,21 @@ class TagTrackerPipeline:
 
             self.io.publish_data(estimation, frame_timestamp, fps)
 
-            print(self.name + ":", estimation)
+            # if estimation:
+            #     print(self.name + ":", estimation)
 
             if self.enable_gui:
                 gui.overlay_image_observation(image, results)
                 gui.overlay_frame_rate(image, fps)
                 gui_images["Capture: " + self.name] = image
+            if self.logger:
+                for detection in results:
+                    self.logger.log_tag_detect(
+                        frame_timestamp=frame_timestamp,
+                        cam=self.name,
+                        tag_id=detection.id,
+                        corners=detection.corners
+                    )
+                if estimation:
+                    self.logger.log_estimate(frame_timestamp, self.name, estimation)
                 

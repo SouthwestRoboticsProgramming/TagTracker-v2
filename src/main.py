@@ -6,6 +6,10 @@ import environment
 import nt_io
 import ntcore
 import threading
+import output_logger
+import time
+import math
+import sys
 
 def main():
     # Load tag environment from WPILib json
@@ -24,12 +28,14 @@ def main():
         nt_io.append_pose(env_data, pose)
     env_pub.set(env_data)
 
+    logger = output_logger.OutputLogger("log-" + str(math.floor(time.time() * 1000000)) + ".log", also_print=True)
+
     # Set up the pipeline
     webcam_pipe = pipeline.TagTrackerPipeline(
         env=env,
         settings=pipeline.PipelineSettings(
             camera_id=0,
-            name="Laptop Webcam",
+            name="laptop",
             camera_settings=pipeline.CameraSettings(
                 resolution=[640, 480],
                 auto_exposure=3,
@@ -45,14 +51,15 @@ def main():
                 distortion_coeffs=numpy.array([0.01632932, -0.36390723, -0.01638719,  0.02577886,  0.93133364])
             ),
             dictionary_id=cv2.aruco.DICT_APRILTAG_16H5,
-            enable_gui=True
+            enable_gui=True,
+            logger=logger
         )
     )
     usb_pipe = pipeline.TagTrackerPipeline(
         env=env,
         settings=pipeline.PipelineSettings(
             camera_id=2,
-            name="USB Webcam",
+            name="usb",
             camera_settings=pipeline.CameraSettings(
                 resolution=[640, 480],
                 auto_exposure=3,
@@ -68,7 +75,8 @@ def main():
                 distortion_coeffs=numpy.array([0.01632932, -0.36390723, -0.01638719,  0.02577886,  0.93133364])
             ),
             dictionary_id=cv2.aruco.DICT_APRILTAG_16H5,
-            enable_gui=True
+            enable_gui=True,
+            logger=logger
         )
     )
 
@@ -78,6 +86,7 @@ def main():
     gui_images = {}
     threads = [threading.Thread(target=pipe.run, args=(gui_images,)) for pipe in pipelines]
     for thread in threads:
+        thread.daemon = True
         thread.start()
     
     # Wait for threads to finish and show gui images when they are available
@@ -87,12 +96,12 @@ def main():
         for name, image in gui_images.copy().items():
             cv2.imshow(name, image)
 
-        any_running = False
+        # Stop everything if a thread dies (for debugging)
+        # FIXME: Disable this in competition code!
         for thread in threads:
-            if thread.is_alive():
-                any_running = True
-        if not any_running:
-            break
+            if not thread.is_alive():
+                print("A thread crashed, stopping...")
+                sys.exit(1)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
