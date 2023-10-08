@@ -19,18 +19,19 @@ if __name__ == "__main__":
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-    charuco_board = cv2.aruco.CharucoBoard((12,9), 0.230, 0.170, aruco_dict) # Different from 6328
+    charuco_board = cv2.aruco.CharucoBoard((12,9), 0.1952625 / 9, 0.1952625 / 9 * 7/9, aruco_dict) # Different from 6328
     charuco_detector = cv2.aruco.CharucoDetector(charuco_board, cv2.aruco.CharucoParameters(), aruco_params)
 
     # Create webcam
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
 
     frame_count = 0
     while True:
-        frame_count += 1
-        if (frame_count % 4 != 1):
-            next
         ret, color = cap.read()
+
+        frame_count += 1
+        if (frame_count % 10 != 1):
+            continue
 
         # Convert to grayscale
         image = cv2.cvtColor(color, cv2.COLOR_BGR2GRAY)
