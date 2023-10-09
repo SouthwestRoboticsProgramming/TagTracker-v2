@@ -41,5 +41,5 @@ class NetworkTablesIO:
 
         # Send it
         # Set the entry's timestamp so robot code knows when frame was captured
-        self.poses_pub.set(pose_data, math.floor(timestamp * 1000000))
+        self.poses_pub.set(pose_data, math.floor(timestamp * 10e5))
         self.fps_pub.set(fps)
