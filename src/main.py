@@ -11,6 +11,8 @@ import time
 import math
 import sys
 import json
+import detect
+import log_replay
 from dataclasses import dataclass
 from argparse import ArgumentParser
 
@@ -48,6 +50,8 @@ def main():
     )
     parser.add_argument("-g", "--gui", action="store_true", help="Enable camera preview GUI")
     parser.add_argument("-c", "--config", type=str, default="config.json", help="Path to config JSON")
+    parser.add_argument("-r", "--replay", type=str, help="Log file to replay")
+    parser.add_argument("-f", "--fast", action="store_true", help="Replay faster than real time")
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
@@ -78,10 +82,15 @@ def main():
         nt_io.append_pose(env_data, pose)
     env_pub.set(env_data)
     
-    if config_obj["log-outputs"]:
+    if config_obj["log-outputs"] and not args.replay:
         logger = output_logger.OutputLogger("log-" + str(math.floor(time.time() * 1000000)) + ".ttlog", also_print=True)
     else:
         logger = None
+
+    if args.replay:
+        replay = log_replay.LogReplay(args.replay, not args.fast)
+    else:
+        replay = None
 
     # Set up the pipelines
     pipelines = []
@@ -92,7 +101,7 @@ def main():
             settings=pipeline.PipelineSettings(
                 camera_id=camera_obj["id"],
                 name=camera_obj["name"],
-                camera_settings=pipeline.CameraSettings(
+                camera_settings=detect.CameraSettings(
                     resolution=calib.resolution,
                     auto_exposure=camera_obj["auto-exposure"],
                     exposure=camera_obj["exposure"],
@@ -101,7 +110,8 @@ def main():
                 calibration=calib.info,
                 dictionary_id=dict,
                 enable_gui=args.gui,
-                logger=logger
+                logger=logger,
+                replay=replay
             )
         )
         pipelines.append(pipe)
@@ -120,6 +130,9 @@ def main():
             # OpenCV crashes if you do this on the pipeline thread
             for name, image in gui_images.copy().items():
                 cv2.imshow(name, image)
+
+            if replay:
+                replay.step()
 
             # Stop everything if a thread dies (for debugging)
             # FIXME: Disable this in competition code!

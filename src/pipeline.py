@@ -6,44 +6,27 @@ import detect
 import time
 import gui
 import output_logger
+import log_replay
 from dataclasses import dataclass
-
-@dataclass
-class CameraSettings:
-    resolution: tuple[int, int]
-    auto_exposure: int
-    exposure: float
-    gain: float
 
 @dataclass
 class PipelineSettings:
     camera_id: int|str
     name: str
-    camera_settings: CameraSettings
+    camera_settings: detect.CameraSettings
     calibration: solve.CalibrationInfo
     dictionary_id: int
     enable_gui: bool = False
     logger: output_logger.OutputLogger = None
-
-class Capture:
-    video: cv2.VideoCapture
-
-    def __init__(self, camera_id: int|str, settings: CameraSettings):
-        self.video = cv2.VideoCapture(camera_id)
-        self.video.set(cv2.CAP_PROP_FRAME_WIDTH, settings.resolution[0])
-        self.video.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.resolution[1])
-        self.video.set(cv2.CAP_PROP_AUTO_EXPOSURE, settings.auto_exposure)
-        self.video.set(cv2.CAP_PROP_EXPOSURE, settings.exposure)
-        self.video.set(cv2.CAP_PROP_GAIN, settings.gain)
-
-    def read_frame(self) -> tuple[bool, cv2.Mat]:
-        retval, image = self.video.read()
-        return (retval, image)
+    replay: log_replay.LogReplay = None
 
 class TagTrackerPipeline:
     def __init__(self, env: environment.TagEnvironment, settings: PipelineSettings):
-        self.capture = Capture(settings.camera_id, settings.camera_settings)
-        self.detector = detect.TagDetector(settings.dictionary_id)
+        if settings.replay:
+            self.detector = settings.replay.get_detector(settings.name)
+        else:
+            self.detector = detect.TagDetector(settings.dictionary_id, settings.camera_id, settings.camera_settings)
+        
         self.estimator = solve.PoseEstimator(
             env=env,
             calibration=settings.calibration
@@ -62,12 +45,8 @@ class TagTrackerPipeline:
         print("Capture started:", self.name)
         while self.running:
             frame_timestamp = time.time()
-            retval, image = self.capture.read_frame()
-            if not retval:
-                print(f"Did not receive image from {self.name}")
-                continue
 
-            results = self.detector.detect(image)
+            results, image = self.detector.detect()
             estimation = self.estimator.estimate_pose(results)
 
             fps_count += 1
@@ -81,18 +60,13 @@ class TagTrackerPipeline:
             # if estimation:
             #     print(f"{self.name} : {estimation}")
 
-            if self.enable_gui:
+            if self.enable_gui and image is not None:
                 gui.overlay_image_observation(image, results)
                 gui.overlay_frame_rate(image, fps)
                 gui_images["Capture: " + self.name] = image
             if self.logger:
-                for detection in results:
-                    self.logger.log_tag_detect(
-                        frame_timestamp=frame_timestamp,
-                        cam=self.name,
-                        tag_id=detection.id,
-                        corners=detection.corners
-                    )
+                if len(results) > 0:
+                    self.logger.log_tag_detects(frame_timestamp, self.name, results)
                 if estimation:
                     self.logger.log_estimate(frame_timestamp, self.name, estimation)
                 

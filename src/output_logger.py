@@ -5,6 +5,7 @@ import struct
 import queue
 import threading
 import time
+import detect
 
 import solve
 
@@ -58,45 +59,58 @@ class OutputLogger:
         thr.start()
         self.should_print = also_print
 
-    def log_tag_detect(
+    def write_event(self, frame_timestamp: float, event_id: int, cam: str, data: bytes):
+        cam_data = cam.encode()
+        header = struct.pack(">dbb", frame_timestamp, event_id, len(cam_data))
+        header += cam_data
+        header += data
+        
+        d = struct.pack(">bH", START_BYTE, len(header))
+        d += header
+        self.write_queue.put(d)
+
+    def log_tag_detects(
             self,
             frame_timestamp: float,
             cam: str, 
-            tag_id: int, 
-            corners: numpy.typing.NDArray[numpy.float64]):
-        data = pack_header(frame_timestamp, 0, cam)
+            detections: list[detect.DetectedTag]):
+        data = struct.pack(">b", len(detections))
+        for detect in detections:
+            tag_id = detect.id
+            corners = detect.corners
 
-        # Pretty sure it's safe to assume there's always 4 corners, but
-        # prefixing with count anyway
-        data += struct.pack(">bb", tag_id, len(corners[0]))
-        for corner in corners[0]:
-            data += struct.pack(">dd", corner[0], corner[1])
-
-        self.write_queue.put(data)
-        if self.should_print:
-            corners_str = ""
+            # Pretty sure it's safe to assume there's always 4 corners, but
+            # prefixing with count anyway
+            data += struct.pack(">bb", tag_id, len(corners[0]))
             for corner in corners[0]:
-                corners_str += " " + str(corner[0]) + "," + str(corner[1])
-            print(frame_timestamp, cam, "detect:", tag_id, "@" + corners_str)
+                data += struct.pack(">dd", corner[0], corner[1])
+            
+            if self.should_print:
+                corners_str = ""
+                for corner in corners[0]:
+                    corners_str += " " + str(corner[0]) + "," + str(corner[1])
+                print(frame_timestamp, cam, "detect:", tag_id, "@" + corners_str)
+
+        self.write_event(frame_timestamp, 0, cam, data)
 
     def log_estimate(
             self,
             frame_timestamp: float,
             cam: str,
             estimate: solve.PoseEstimation):
-        data = pack_header(frame_timestamp, 1, cam) + struct.pack(">b", len(estimate.ids))
-        for id in estimate.ids:
-            data += struct.pack(">b", id)
+        # TODO: Disabled because the data is not needed
+        # data = struct.pack(">b", len(estimate.ids))
+        # for id in estimate.ids:
+        #     data += struct.pack(">b", id)
 
-        data += pack_estimate(estimate.estimate_a)
-        if estimate.estimate_b:
-            data += struct.pack('>?', True)
-            data += pack_estimate(estimate.estimate_b)
-        else:
-            data += struct.pack('>?', False)
+        # data += pack_estimate(estimate.estimate_a)
+        # if estimate.estimate_b:
+        #     data += struct.pack('>?', True)
+        #     data += pack_estimate(estimate.estimate_b)
+        # else:
+        #     data += struct.pack('>?', False)
 
-        # self.file.write(data)
-        self.write_queue.put(data)
+        # self.write_event(frame_timestamp, 1, cam, data)
 
         if self.should_print:
             print(frame_timestamp, cam, "est:", estimate)
