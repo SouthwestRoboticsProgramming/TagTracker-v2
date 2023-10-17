@@ -1,13 +1,12 @@
-import numpy.typing
 import os
-from wpimath.geometry import *
-import struct
 import queue
+import struct
 import threading
 import time
-import detect
+from wpimath.geometry import *
 
-import solve
+import detect
+import nt_io
 
 START_BYTE = 0x5A
 
@@ -51,13 +50,13 @@ def write_thread(file_name: str, write_queue: queue.Queue):
             # Ignore that
             pass
 
-class OutputLogger:
-    def __init__(self, file_name: str, also_print: bool = False):
+class FileLogger:
+    def __init__(self, file_name: str):
+        print("Logging to " + file_name)
         self.write_queue = queue.Queue()
         thr = threading.Thread(target=write_thread, args=(file_name, self.write_queue))
         thr.daemon = True
         thr.start()
-        self.should_print = also_print
 
     def write_event(self, frame_timestamp: float, event_id: int, cam: str, data: bytes):
         cam_data = cam.encode()
@@ -84,33 +83,20 @@ class OutputLogger:
             data += struct.pack(">bb", tag_id, len(corners[0]))
             for corner in corners[0]:
                 data += struct.pack(">dd", corner[0], corner[1])
-            
-            if self.should_print:
-                corners_str = ""
-                for corner in corners[0]:
-                    corners_str += " " + str(corner[0]) + "," + str(corner[1])
-                print(frame_timestamp, cam, "detect:", tag_id, "@" + corners_str)
 
         self.write_event(frame_timestamp, 0, cam, data)
 
-    def log_estimate(
-            self,
-            frame_timestamp: float,
-            cam: str,
-            estimate: solve.PoseEstimation):
-        # TODO: Disabled because the data is not needed
-        # data = struct.pack(">b", len(estimate.ids))
-        # for id in estimate.ids:
-        #     data += struct.pack(">b", id)
+    def log_match_info(self, info: nt_io.MatchInfo):
+        event_data = info.event_name.encode()
+        data = struct.pack(">H", len(event_data)) + event_data
 
-        # data += pack_estimate(estimate.estimate_a)
-        # if estimate.estimate_b:
-        #     data += struct.pack('>?', True)
-        #     data += pack_estimate(estimate.estimate_b)
-        # else:
-        #     data += struct.pack('>?', False)
+        data += struct.pack(
+            ">iii?i",
+            info.match_num,
+            info.match_type,
+            info.replay_num,
+            info.is_red,
+            info.station_num
+        )
 
-        # self.write_event(frame_timestamp, 1, cam, data)
-
-        if self.should_print:
-            print(frame_timestamp, cam, "est:", estimate)
+        self.write_event(time.time(), 1, "", data)

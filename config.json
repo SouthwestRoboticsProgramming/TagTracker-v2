@@ -4,24 +4,24 @@
         "server-ip": "localhost",
         "identity": "TagTracker-v2"
     },
-    "log-outputs": true,
     "tag-family": "16h5",
+    "process-threads": 2,
     "cameras": [
         {
             "id": 0,
             "name": "laptop",
-            "calibration": "calibrations/hp_probook_11_g2_webcam.json",
-            "auto-exposure": 3,
-            "exposure": 0.01,
-            "gain": 1
-        },
-        {
-            "id": 2,
-            "name": "usb",
-            "calibration": "calibrations/logitech_c250.json",
-            "auto-exposure": 3,
-            "exposure": 0.01,
-            "gain": 1
+            "stream-format": "MJPG",
+            "auto-exposure": 1,
+            "exposure": 100,
+            "gain": 10,
+            "calibration": "calibrations/hp_probook_11_g2_webcam.json"
         }
-    ]
+    ],
+    "web-stream": {
+        "port": 8000
+    },
+    "logging": {
+        "enabled": true,
+        "output-dir": "./"
+    }
 }

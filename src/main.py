@@ -1,47 +1,21 @@
-import pipeline
-import solve
+# Data flow:
+# Camera input threads put frames into frame queue
+# Tag process threads take frames from frame queue, find tags, estimate pose, put results into result queue
+# Main thread reads result queue, sends to NT, logs, shows GUI
+
 import cv2
-import numpy
-import environment
-import nt_io
-import ntcore
-import threading
-import output_logger
-import time
 import math
-import sys
-import json
-import detect
-import log_replay
-from dataclasses import dataclass
+import queue
+import random
+import time
 from argparse import ArgumentParser
 
-@dataclass
-class CalibrationData:
-    resolution: tuple[float, float]
-    info: solve.CalibrationInfo
-
-def load_calibration_data(file_name: str):
-    with open(file_name, 'r') as json_file:
-        json_obj = json.load(json_file)
-
-    res_obj = json_obj["camera_resolution"]
-    res_data = res_obj["data"]
-    res = (res_data[1], res_data[0])
-
-    mtx_obj = json_obj["camera_matrix"]
-    mtx = numpy.array(mtx_obj["data"]).reshape(3, 3)
-
-    dist_obj = json_obj["distortion_coefficients"]
-    dist = numpy.array(dist_obj["data"])
-
-    return CalibrationData(
-        resolution=res,
-        info=solve.CalibrationInfo(
-            matrix=mtx,
-            distortion_coeffs=dist
-        )
-    )
+import config
+import capture
+import nt_io
+import output_logger
+import process
+import web_stream
 
 def main():
     parser = ArgumentParser(
@@ -50,110 +24,91 @@ def main():
     )
     parser.add_argument("-g", "--gui", action="store_true", help="Enable camera preview GUI")
     parser.add_argument("-c", "--config", type=str, default="config.json", help="Path to config JSON")
-    parser.add_argument("-r", "--replay", type=str, help="Log file to replay")
-    parser.add_argument("-f", "--fast", action="store_true", help="Replay faster than real time")
+    # parser.add_argument("-r", "--replay", type=str, help="Log file to replay")
+    # parser.add_argument("-f", "--fast", action="store_true", help="Replay faster than real time")
     args = parser.parse_args()
 
-    with open(args.config, "r") as f:
-        config_obj = json.load(f)
+    conf = config.load_config(args.config)
 
-    # Load tag environment from WPILib json
-    env = environment.TagEnvironment(config_obj["environment"])
-
-    if config_obj["tag-family"] == "16h5":
+    if conf.tag_family == "16h5":
         dict = cv2.aruco.DICT_APRILTAG_16H5
-    elif config_obj["tag-family"] == "36h11":
+    elif conf.tag_family == "36h11":
         dict = cv2.aruco.DICT_APRILTAG_36H11
     else:
-        print("Unsupported tag family: " + str(config_obj["tag-family"]))
+        print("Unsupported tag family: " + conf.tag_family)
         return
 
     # Connect to NetworkTables server
-    nt_config = config_obj["networktables"]
-    nt = ntcore.NetworkTableInstance.getDefault()
-    nt.setServer(nt_config["server-ip"])
-    nt.startClient4(nt_config["identity"])
-    
-    # Publish the tag environment so ShuffleLog can visualize it
-    env_pub = nt.getDoubleArrayTopic("/TagTracker/environment").publish()
-    env_data = []
-    for id, pose in env.tags.items():
-        env_data.append(id)
-        nt_io.append_pose(env_data, pose)
-    env_pub.set(env_data)
-    
-    if config_obj["log-outputs"] and not args.replay:
-        logger = output_logger.OutputLogger("log-" + str(math.floor(time.time() * 1000000)) + ".ttlog", also_print=True)
+    nt = nt_io.NetworkTablesIO(conf.networktables, conf.environment)
+
+    frame_queue = queue.PriorityQueue()
+    result_queue = queue.PriorityQueue()
+
+    threads = []
+    for camera_config in conf.cameras:
+        threads.append(capture.CameraInputThread(camera_config, frame_queue))
+
+    for _ in range(0, conf.process_threads):
+        threads.append(process.TagProcessThread(dict, conf.environment, frame_queue, result_queue))
+
+    stream = web_stream.StreamServer(conf.stream)
+    stream.start()
+
+    if conf.logging.enabled:
+        log_file_name = conf.logging.output_dir + "log_" + str(math.floor(random.random() * 1e16)) + ".ttlog"
+        logger = output_logger.FileLogger(log_file_name)
     else:
         logger = None
 
-    if args.replay:
-        replay = log_replay.LogReplay(args.replay, not args.fast)
-    else:
-        replay = None
-
-    # Set up the pipelines
-    pipelines = []
-    for camera_obj in config_obj["cameras"]:
-        calib = load_calibration_data(camera_obj["calibration"])
-        pipe = pipeline.TagTrackerPipeline(
-            env=env,
-            settings=pipeline.PipelineSettings(
-                camera_id=camera_obj["id"],
-                name=camera_obj["name"],
-                camera_settings=detect.CameraSettings(
-                    resolution=calib.resolution,
-                    auto_exposure=camera_obj["auto-exposure"],
-                    exposure=camera_obj["exposure"],
-                    gain=camera_obj["gain"]
-                ),
-                calibration=calib.info,
-                dictionary_id=dict,
-                enable_gui=args.gui,
-                logger=logger,
-                replay=replay
-            )
-        )
-        pipelines.append(pipe)
-
-    # Run the pipelines
-    gui_images = {}
-    threads = [threading.Thread(target=pipe.run, args=(gui_images,)) for pipe in pipelines]
     for thread in threads:
-        thread.daemon = True
         thread.start()
 
-    # Wait for threads to finish and show gui images when they are available
     try:
+        camera_count = len(conf.cameras)
+        i = 0
+        prev_match_info = None
         while True:
-            # Show images on main thread
-            # OpenCV crashes if you do this on the pipeline thread
-            for name, image in gui_images.copy().items():
-                cv2.imshow(name, image)
+            result = result_queue.get()
+            frame = result.frame
 
-            if replay:
-                replay.step()
+            top = frame.image.shape[0] - 100
+            def put_text(text: str, pos, color):
+                cv2.putText(frame.image, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+            put_text("Frame queue: " + str(frame_queue.qsize()), (5, top), (64, 128, 255))
+            put_text("Result queue: " + str(result_queue.qsize()), (5, top + 40), (64, 128, 255))
+            put_text(f"Frame age: {(time.time() - frame.timestamp) :.3f}", (5, top + 80), (64, 128, 255))
 
-            # Stop everything if a thread dies (for debugging)
-            # FIXME: Disable this in competition code!
-            for thread in threads:
-                if not thread.is_alive():
-                    print("A thread crashed, stopping...")
-                    sys.exit(1)
+            nt.publish_output(result)
+            stream.publish_frame(frame.camera, frame.image)
 
-            if args.gui and cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-    except KeyboardInterrupt:
-        print("Shutting down...")
-        
-    # Stop the pipeline threads
-    for pipe in pipelines:
-        pipe.running = False
+            if logger:
+                match_info = nt.get_match_info()
+                if match_info != prev_match_info:
+                    print("Got match info:", match_info)
+                    logger.log_match_info(match_info)
+                    prev_match_info = match_info
+                
+                if len(result.detections) != 0:
+                    logger.log_tag_detects(frame.timestamp, frame.camera, result.detections)
+
+            if args.gui:
+                cv2.imshow(frame.camera, frame.image)
+                if i == 0 and cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            
+            # Only waitKey once for all cameras
+            i += 1
+            if i >= camera_count:
+                i = 0
+    except KeyboardInterrupt as _:
+        print("Interrupted...")
+
+    for thread in threads:
+        thread.running = False
     for thread in threads:
         thread.join()
-    
-    if args.gui:
-        cv2.destroyAllWindows()
+
+    print("done :)")
 
 if __name__ == "__main__":
     main()

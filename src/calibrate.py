@@ -25,6 +25,11 @@ if __name__ == "__main__":
     # Create webcam
     cap = cv2.VideoCapture(0)
 
+    # Try to set resolution to really big, OpenCV will fall back to
+    # the camera's highest supported resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1000000)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1000000)
+
     frame_count = 0
     while True:
         ret, color = cap.read()

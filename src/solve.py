@@ -1,23 +1,16 @@
-import numpy
-import numpy.typing
 import cv2
-import detect
 import math
-import environment
-from wpimath.geometry import *
+import numpy
 from dataclasses import dataclass
+from wpimath.geometry import *
+
+import config
+import detect
 
 @dataclass
-class PoseEstimation:
-    ids: list[int]
-    # Tuple of (pose, error)
-    estimate_a: tuple[Pose3d, float]
-    estimate_b: tuple[Pose3d, float]
-
-@dataclass
-class CalibrationInfo:
-    matrix: numpy.typing.NDArray[numpy.float64]
-    distortion_coeffs: numpy.typing.NDArray[numpy.float64]
+class EstimatePair:
+    pose_a: tuple[Pose3d, float]
+    pose_b: tuple[Pose3d, float]
 
 # OpenCV tvec and rvec (from perspective of camera) are +X right, +Y down, +Z forward 
 # WPI coordinates (from perspective of identity pose): +X forward, +Y left, +Z up
@@ -38,19 +31,19 @@ def wpiToCv(tx: Translation3d) -> list[float]:
     return [-tx.Y(), -tx.Z(), tx.X()]
 
 class PoseEstimator:
-    def __init__(self, calibration: CalibrationInfo, env: environment.TagEnvironment):
-        self.tag_size = env.tag_size
-        self.calibration = calibration
+    env: config.TagEnvironment
+
+    def __init__(self, env: config.TagEnvironment):
         self.env = env
 
-    def estimate_pose(self, tag_infos: list[detect.DetectedTag]) -> PoseEstimation:    
+    def solve(self, calibration: config.CalibrationInfo, detections: list[detect.DetectedTag]) -> EstimatePair:
         # Collect the corner positions of all the detected tags in field space
-        half_sz = self.tag_size / 2.0
+        half_sz = self.env.tag_size / 2.0
         object_points = []
         image_points = []
         tag_ids = []
         tag_poses = []
-        for tag_info in tag_infos:
+        for tag_info in detections:
             tag_pose = self.env.get_tag_pose(tag_info.id)
             if tag_pose:
                 # Get corner positions in field space
@@ -90,7 +83,7 @@ class PoseEstimator:
                 # In this case that is tag space, so they transform camera to tag
                 _, rvecs, tvecs, errors = cv2.solvePnPGeneric(
                     object_points, numpy.array(image_points),
-                    self.calibration.matrix, self.calibration.distortion_coeffs, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+                    calibration.matrix, calibration.distortion_coeffs, flags=cv2.SOLVEPNP_IPPE_SQUARE)
             except Exception as e:
                 print(e)
                 return None
@@ -114,10 +107,9 @@ class PoseEstimator:
             field_to_camera_pose_0 = Pose3d(field_to_camera_0.translation(), field_to_camera_0.rotation())
             field_to_camera_pose_1 = Pose3d(field_to_camera_1.translation(), field_to_camera_1.rotation())
 
-            return PoseEstimation(
-                ids=tag_ids,
-                estimate_a=(field_to_camera_pose_0, errors[0][0]),
-                estimate_b=(field_to_camera_pose_1, errors[1][0])
+            return EstimatePair(
+                pose_a=(field_to_camera_pose_0, errors[0][0]),
+                pose_b=(field_to_camera_pose_1, errors[1][0])
             )
         elif len(tag_ids) > 1:
             # Multiple tags were found, solve with all of them at once
@@ -125,7 +117,7 @@ class PoseEstimator:
                 # object_points are in field space, so this finds camera to field transform
                 _, rvecs, tvecs, errors = cv2.solvePnPGeneric(
                     numpy.array(object_points), numpy.array(image_points),
-                    self.calibration.matrix, self.calibration.distortion_coeffs, flags=cv2.SOLVEPNP_SQPNP)
+                    calibration.matrix, calibration.distortion_coeffs, flags=cv2.SOLVEPNP_SQPNP)
             except Exception as e:
                 print(e)
                 return None
@@ -136,13 +128,12 @@ class PoseEstimator:
             field_to_camera = camera_to_field.inverse() # camera to field -> field to camera
             field_to_camera_pose = Pose3d(field_to_camera.translation(), field_to_camera.rotation())
 
-            return PoseEstimation(
-                ids=tag_ids,
-                estimate_a=(field_to_camera_pose, errors[0][0]),
+            return EstimatePair(
+                pose_a=(field_to_camera_pose, errors[0][0]),
                 # No estimate B here, ambiguity should have already been resolved by having
                 # multiple tags to sample, since OpenCV will find the set of possibilities
                 # that best match each other
-                estimate_b=None
+                pose_b=None
             )
         else:
             # No known tags were found, we can't estimate anything this frame
