@@ -1,5 +1,6 @@
 import math
 import ntcore
+import time
 from dataclasses import dataclass
 from wpimath.geometry import *
 
@@ -54,8 +55,9 @@ class CameraNetworkTablesIO:
                 pose_data.append(detection.id)
 
         # Send it
-        # Set the entry's timestamp so robot code knows when frame was captured
-        self.poses_pub.set(pose_data, math.floor(result.frame.timestamp * 10e5))
+        # Send how long it took to process the frame for latency correction
+        pose_data.append(time.time() - result.frame.timestamp)
+        self.poses_pub.set(pose_data)
         self.fps_pub.set(result.frame.rate)
 
 class NetworkTablesIO:
