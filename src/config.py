@@ -1,4 +1,5 @@
 import json
+import math
 import numpy
 import numpy.typing
 
@@ -92,15 +93,24 @@ def load_environment(file_name: str) -> TagEnvironment:
         tz = json_translation["z"]
 
         json_rotation = json_pose["rotation"]
-        json_quat = json_rotation["quaternion"]
-        qw = json_quat["W"]
-        qx = json_quat["X"]
-        qy = json_quat["Y"]
-        qz = json_quat["Z"]
+
+        if "euler" in json_rotation:
+            json_euler = json_rotation["euler"]
+            rx = math.radians(json_euler["X"])
+            ry = math.radians(json_euler["Y"])
+            rz = math.radians(json_euler["Z"])
+            rotation = Rotation3d(rx, ry, rz)
+        else:
+            json_quat = json_rotation["quaternion"]
+            qw = json_quat["W"]
+            qx = json_quat["X"]
+            qy = json_quat["Y"]
+            qz = json_quat["Z"]
+            rotation = Rotation3d(Quaternion(qw, qx, qy, qz))
 
         pose = Pose3d(
             Translation3d(tx, ty, tz),
-            Rotation3d(Quaternion(qw, qx, qy, qz))
+            rotation
         )
 
         tags[id] = pose
