@@ -8,13 +8,13 @@
     "process-threads": 2,
     "cameras": [
         {
-            "id": 0,
+            "id": 2,
             "name": "laptop",
             "stream-format": "MJPG",
             "auto-exposure": 1,
-            "exposure": 100,
-            "gain": 10,
-            "calibration": "calibrations/hp_probook_11_g2_webcam.json"
+            "exposure": 10,
+            "gain": 25,
+            "calibration": "calibrations/arducam.json"
         }
     ],
     "web-stream": {

@@ -26,7 +26,10 @@ class CameraInputThread(threading.Thread):
     def __init__(self, settings: config.CameraSettings, frame_queue: queue.PriorityQueue[CameraFrame]):
         threading.Thread.__init__(self)
         self.name = settings.name
-        self.capture = cv2.VideoCapture(settings.id, cv2.CAP_V4L2)
+        # self.capture = cv2.VideoCapture(settings.id, cv2.CAP_V4L2)
+        
+        self.capture = cv2.VideoCapture("v4l2src device=/dev/video2 extra_controls=\"c,exposure_auto=1,exposure_absolute=10,gain=25,sharpness=0,brightness=0\" ! image/jpeg,format=MJPG,width=1600,height=1200 ! jpegdec ! video/x-raw ! appsink drop=1", cv2.CAP_GSTREAMER)
+        
         self.frame_queue = frame_queue
         self.fps = 0
         self.count = 0
@@ -34,16 +37,17 @@ class CameraInputThread(threading.Thread):
         self.calibration = settings.calibration
         self.running = True
 
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, settings.calibration.resolution[0])
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.calibration.resolution[1])
-        self.capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, settings.auto_exposure)
-        self.capture.set(cv2.CAP_PROP_EXPOSURE, settings.exposure)
-        self.capture.set(cv2.CAP_PROP_GAIN, settings.gain)
+        # self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, settings.calibration.resolution[0])
+        # self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.calibration.resolution[1])
+        # self.capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, settings.auto_exposure)
+        # self.capture.set(cv2.CAP_PROP_EXPOSURE, settings.exposure)
+        # self.capture.set(cv2.CAP_PROP_FPS, 50)
+        # self.capture.set(cv2.CAP_PROP_GAIN, settings.gain)
 
         f = settings.stream_format
         if len(f) != 4:
             raise Exception("Stream format must be 4 chars long")
-        self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(f[0], f[1], f[2], f[3]))
+        # self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(f[0], f[1], f[2], f[3]))
     
     def run(self):
         print(self.name, "starting capture", )

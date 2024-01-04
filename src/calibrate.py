@@ -23,7 +23,7 @@ if __name__ == "__main__":
     charuco_detector = cv2.aruco.CharucoDetector(charuco_board, cv2.aruco.CharucoParameters(), aruco_params)
 
     # Create webcam
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(2)
 
     # Try to set resolution to really big, OpenCV will fall back to
     # the camera's highest supported resolution
