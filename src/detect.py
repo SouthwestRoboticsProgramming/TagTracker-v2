@@ -16,6 +16,7 @@ class TagDetector:
 
     def detect(self, image) -> list[DetectedTag]:
         corners, ids, _ = self.detector.detectMarkers(image)
+        # corners, ids, _ = cv2.aruco.detectMarkers(image, self.dict, parameters=self.params)
         if len(corners) == 0:
             return []
         return [DetectedTag(id[0], corner) for id, corner in zip(ids, corners)]
