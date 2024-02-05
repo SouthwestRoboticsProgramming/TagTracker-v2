@@ -19,16 +19,20 @@ if __name__ == "__main__":
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-    charuco_board = cv2.aruco.CharucoBoard((12,9), 0.1952625 / 9, 0.1952625 / 9 * 7/9, aruco_dict) # Different from 6328
+
+    square_size_m = 0.13592 / 6
+    charuco_board = cv2.aruco.CharucoBoard((12,9), square_size_m, square_size_m * 7/9, aruco_dict) # Different from 6328
     charuco_detector = cv2.aruco.CharucoDetector(charuco_board, cv2.aruco.CharucoParameters(), aruco_params)
 
     # Create webcam
-    cap = cv2.VideoCapture(2)
+    cap = cv2.VideoCapture(2, cv2.CAP_V4L2)
 
     # Try to set resolution to really big, OpenCV will fall back to
     # the camera's highest supported resolution
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1000000)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1000000)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+    cap.set(cv2.CAP_PROP_FPS, 50)
 
     frame_count = 0
     while True:
@@ -63,7 +67,8 @@ if __name__ == "__main__":
                 print("Saved frame for calibration")
 
         # cv2.aruco.drawDetectedCornersCharuco(image, corners)
-        cv2.imshow("Image", image)
+        small = cv2.resize(image, (0, 0), fx = 0.25, fy = 0.25)
+        cv2.imshow("Image", small)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

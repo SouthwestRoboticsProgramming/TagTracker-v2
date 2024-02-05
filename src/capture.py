@@ -27,23 +27,30 @@ class CameraInputThread(threading.Thread):
         threading.Thread.__init__(self)
         self.name = settings.name
 
-        if isinstance(settings.id, str):
-            device_path = settings.id
-        else:
-            device_path = "/dev/video" + str(settings.id)
-
-        pipeline = "v4l2src device=" + device_path + " extra_controls=\"c"
-        pipeline += ",exposure_auto=" + str(settings.auto_exposure)
-        pipeline += ",exposure_absolute=" + str(settings.exposure)
-        pipeline += ",gain=" + str(settings.gain)
-        pipeline += ",sharpness=0,brightness=0\""
-        pipeline += " ! image/jpeg,format=MJPG"
-        pipeline += ",width=" + str(settings.calibration.resolution[0])
-        pipeline += ",height=" + str(settings.calibration.resolution[1])
-        pipeline += " ! jpegdec ! video/x-raw ! appsink drop=1"
-        print("GStreamer pipeline:", pipeline)
+        # TODO: Make configurable again
+        self.capture = cv2.VideoCapture(settings.id, cv2.CAP_V4L2)
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
+        self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+        self.capture.set(cv2.CAP_PROP_FPS, 50)
         
-        self.capture = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+#        if isinstance(settings.id, str):
+#            device_path = settings.id
+#        else:
+#            device_path = "/dev/video" + str(settings.id)
+
+#        pipeline = "v4l2src device=" + device_path + " extra_controls=\"c"
+#        pipeline += ",exposure_auto=" + str(settings.auto_exposure)
+#        pipeline += ",exposure_absolute=" + str(settings.exposure)
+#        pipeline += ",gain=" + str(settings.gain)
+#        pipeline += ",sharpness=0,brightness=0\""
+#        pipeline += " ! image/jpeg,format=MJPG"
+#        pipeline += ",width=" + str(settings.calibration.resolution[0])
+#        pipeline += ",height=" + str(settings.calibration.resolution[1])
+#        pipeline += " ! jpegdec ! video/x-raw ! appsink drop=1"
+#        print("GStreamer pipeline:", pipeline)
+        
+#        self.capture = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
         
         self.frame_queue = frame_queue
         self.fps = 0

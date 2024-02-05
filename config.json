@@ -4,7 +4,7 @@
         "server-ip": "localhost",
         "identity": "TagTracker-v2"
     },
-    "tag-family": "16h5",
+    "tag-family": "36h11",
     "process-threads": 10,
     "cameras": [
         {
