@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 
 import config
 
+@dataclass
+class CameraParams:
+    auto_exposure: bool
+    exposure: int
+    gain: int
+    target_fps: int
+
 @dataclass(order=True)
 class CameraFrame:
     timestamp: float
@@ -13,6 +20,14 @@ class CameraFrame:
     calibration: config.CalibrationInfo
     image: cv2.Mat = field(compare=False)
     rate: int = field(compare=False)
+
+def is_config_different(a: CameraParams, b: CameraParams) -> bool:
+    if a is None and b is None:
+        return False
+    if a is None or b is None:
+        return True
+    
+    return a.auto_exposure != b.auto_exposure or a.exposure != b.exposure or a.gain != b.gain or a.target_fps != b.target_fps
 
 class CameraInputThread(threading.Thread):
     name: str
@@ -23,47 +38,56 @@ class CameraInputThread(threading.Thread):
     prev_time: float
     running: bool
 
-    def __init__(self, settings: config.CameraSettings, frame_queue: queue.PriorityQueue[CameraFrame]):
+    # nt is CameraNetworkTablesIO
+    def __init__(self, settings: config.CameraSettings, frame_queue: queue.PriorityQueue[CameraFrame], nt):
         threading.Thread.__init__(self)
-        self.name = settings.name
-
-        # TODO: Make configurable again
-        self.capture = cv2.VideoCapture(settings.id, cv2.CAP_V4L2)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1600)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
-        self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-        self.capture.set(cv2.CAP_PROP_FPS, 50)
-        
-#        if isinstance(settings.id, str):
-#            device_path = settings.id
-#        else:
-#            device_path = "/dev/video" + str(settings.id)
-
-#        pipeline = "v4l2src device=" + device_path + " extra_controls=\"c"
-#        pipeline += ",exposure_auto=" + str(settings.auto_exposure)
-#        pipeline += ",exposure_absolute=" + str(settings.exposure)
-#        pipeline += ",gain=" + str(settings.gain)
-#        pipeline += ",sharpness=0,brightness=0\""
-#        pipeline += " ! image/jpeg,format=MJPG"
-#        pipeline += ",width=" + str(settings.calibration.resolution[0])
-#        pipeline += ",height=" + str(settings.calibration.resolution[1])
-#        pipeline += " ! jpegdec ! video/x-raw ! appsink drop=1"
-#        print("GStreamer pipeline:", pipeline)
-        
-#        self.capture = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+        self.settings = settings
+        self.nt = nt
         
         self.frame_queue = frame_queue
         self.fps = 0
         self.count = 0
         self.prev_time = time.time()
         self.calibration = settings.calibration
+        self.capture = None
+        self.current_config = None
         self.running = True
-    
+
+    def next_frame(self) -> tuple[bool, cv2.Mat]:
+        config = self.nt.get_config_params()
+        if is_config_different(self.current_config, config) and self.capture != None:
+            print(self.settings.name, "stopping capture")
+            self.capture.release()
+            self.capture = None
+        
+        if self.capture is None and config != None:
+            print(self.settings.name, "opening capture")
+            self.capture = cv2.VideoCapture(self.settings.id, cv2.CAP_V4L2)
+        
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.calibration.resolution[0])
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.calibration.resolution[1])
+            self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+            
+            self.capture.set(cv2.CAP_PROP_FPS, config.target_fps)
+            self.capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 3 if config.auto_exposure else 1)
+            self.capture.set(cv2.CAP_PROP_EXPOSURE, config.exposure)
+            self.capture.set(cv2.CAP_PROP_GAIN, config.gain)
+
+            self.current_config = config
+
+        if self.capture is None:
+            return (False, None)
+        else:
+            ret = self.capture.read()
+            if not ret[0]:
+                print(self.settings.name, "did not receive image")
+            return ret
+
     def run(self):
-        print(self.name, "starting capture", )
+        print(self.settings.name, "starting capture thread")
         while self.running:
             timestamp = time.time()
-            retval, image = self.capture.read()
+            retval, image = self.next_frame()
             if retval:
                 self.count += 1
                 # Use while in case a frame took over 1 second
@@ -71,18 +95,17 @@ class CameraInputThread(threading.Thread):
                     self.fps = self.count
                     self.count = 0
                     self.prev_time += 1
-                    print(self.name, "fps:", self.fps)
+                    print(self.settings.name, "fps:", self.fps)
 
                 self.frame_queue.put(CameraFrame(
                     timestamp=timestamp,
-                    camera=self.name,
+                    camera=self.settings.name,
                     calibration=self.calibration,
                     image=image,
                     rate=self.fps
                 ))
             else:
-                print(self.name, "did not receive image")
-                time.sleep(0.2)
+                time.sleep(1)
 
         self.capture.release()
-        print(self.name, "stopped capture")
+        print(self.settings.name, "stopped capture thread")

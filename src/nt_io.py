@@ -6,6 +6,7 @@ from wpimath.geometry import *
 
 import config
 import process
+import capture
 
 @dataclass
 class MatchInfo:
@@ -33,12 +34,30 @@ def append_estimate(pose_data: list[float], est: tuple[Pose3d, float]):
 
 class CameraNetworkTablesIO:
     def __init__(self, camera: str):
-        inst = ntcore.NetworkTableInstance.getDefault()
-        table = inst.getTable("/TagTracker/Cameras/" + camera)
+        self.inst = ntcore.NetworkTableInstance.getDefault()
+        table = self.inst.getTable("/TagTracker/Cameras/" + camera)
 
-        self.poses_pub = table.getDoubleArrayTopic("poses").publish(
+        self.config_table = table.getSubTable("Config")
+        self.config_table.getEntry("Auto Exposure").setDefaultBoolean(False)
+        self.config_table.getEntry("Exposure").setDefaultInteger(30)
+        self.config_table.getEntry("Gain").setDefaultInteger(1)
+        self.config_table.getEntry("Target FPS").setDefaultInteger(1)
+
+        output_table = table.getSubTable("Outputs")
+        self.poses_pub = output_table.getDoubleArrayTopic("poses").publish(
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
-        self.fps_pub = table.getDoubleTopic("fps").publish()
+        self.fps_pub = output_table.getDoubleTopic("fps").publish()
+
+    def get_config_params(self) -> capture.CameraParams:
+        if not self.inst.isConnected():
+            return None
+
+        return capture.CameraParams(
+            auto_exposure=self.config_table.getEntry("Auto Exposure").getBoolean(False),
+            exposure=self.config_table.getEntry("Exposure").getInteger(30),
+            gain=self.config_table.getEntry("Gain").getInteger(1),
+            target_fps=self.config_table.getEntry("Target FPS").getInteger(50)
+        )
 
     def publish_output(self, result: process.FrameResult):
         est = result.estimates
@@ -81,13 +100,17 @@ class NetworkTablesIO:
 
         self.fms = nt.getTable("FMSInfo")
 
+    def get_camera_io(self, cam_name: str) -> CameraNetworkTablesIO:
+        if not cam_name in self.cameras:
+            io = CameraNetworkTablesIO(cam_name)
+            self.cameras[cam_name] = io
+            return io
+        else:
+            return self.cameras[cam_name]
+
     def publish_output(self, result: process.FrameResult):
         frame = result.frame
-        if not frame.camera in self.cameras:
-            io = CameraNetworkTablesIO(frame.camera)
-            self.cameras[frame.camera] = io
-        else:
-            io = self.cameras[frame.camera]
+        io = self.get_camera_io(frame.camera)
         io.publish_output(result)
 
     def get_match_info(self) -> MatchInfo:

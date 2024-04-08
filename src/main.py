@@ -46,7 +46,8 @@ def main():
 
     threads = []
     for camera_config in conf.cameras:
-        threads.append(capture.CameraInputThread(camera_config, frame_queue))
+        io = nt.get_camera_io(camera_config.name)
+        threads.append(capture.CameraInputThread(camera_config, frame_queue, io))
 
     for _ in range(0, conf.process_threads):
         threads.append(process.TagProcessThread(dict, conf.environment, frame_queue, result_queue))

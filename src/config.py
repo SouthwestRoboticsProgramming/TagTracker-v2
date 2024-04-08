@@ -16,9 +16,6 @@ class CalibrationInfo:
 class CameraSettings:
     id: int
     name: str
-    auto_exposure: int
-    exposure: float
-    gain: float
     calibration: CalibrationInfo
 
 @dataclass
@@ -132,9 +129,6 @@ def load_config(file_name: str) -> TagTrackerConfig:
         cameras.append(CameraSettings(
             id=camera_obj["id"],
             name=camera_obj["name"],
-            auto_exposure=camera_obj["auto-exposure"],
-            exposure=camera_obj["exposure"],
-            gain=camera_obj["gain"],
             calibration=load_calibration(camera_obj["calibration"])
         ))
 
