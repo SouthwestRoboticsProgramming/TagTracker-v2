@@ -74,6 +74,7 @@ class CameraInputThread(threading.Thread):
             self.capture.set(cv2.CAP_PROP_GAIN, config.gain)
 
             self.current_config = config
+            print(self.settings.name, "applied config:", config)
 
         if self.capture is None:
             return (False, None)

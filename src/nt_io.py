@@ -38,10 +38,11 @@ class CameraNetworkTablesIO:
         table = self.inst.getTable("/TagTracker/Cameras/" + camera)
 
         self.config_table = table.getSubTable("Config")
-        self.config_table.getEntry("Auto Exposure").setDefaultBoolean(False)
-        self.config_table.getEntry("Exposure").setDefaultInteger(30)
-        self.config_table.getEntry("Gain").setDefaultInteger(1)
-        self.config_table.getEntry("Target FPS").setDefaultInteger(1)
+
+        opt = ntcore.PubSubOptions()
+        opt.sendAll = True
+
+        self.exposure_sub = self.config_table.getDoubleTopic("Exposure").subscribe(31.0, opt)
 
         output_table = table.getSubTable("Outputs")
         self.poses_pub = output_table.getDoubleArrayTopic("poses").publish(
@@ -54,9 +55,9 @@ class CameraNetworkTablesIO:
 
         return capture.CameraParams(
             auto_exposure=self.config_table.getEntry("Auto Exposure").getBoolean(False),
-            exposure=self.config_table.getEntry("Exposure").getInteger(30),
-            gain=self.config_table.getEntry("Gain").getInteger(1),
-            target_fps=self.config_table.getEntry("Target FPS").getInteger(50)
+            exposure=self.config_table.getEntry("Exposure").getDouble(42),
+            gain=self.config_table.getEntry("Gain").getDouble(1),
+            target_fps=self.config_table.getEntry("Target FPS").getDouble(50)
         )
 
     def publish_output(self, result: process.FrameResult):
