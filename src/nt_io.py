@@ -76,7 +76,7 @@ class CameraNetworkTablesIO:
 
         # Send it
         # Send how long it took to process the frame for latency correction
-        pose_data.append(time.time() - result.frame.timestamp)
+        pose_data.append(time.monotonic() - result.frame.timestamp)
         self.poses_pub.set(pose_data)
         self.fps_pub.set(result.frame.rate)
 

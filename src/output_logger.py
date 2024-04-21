@@ -99,4 +99,4 @@ class FileLogger:
             info.station_num
         )
 
-        self.write_event(time.time(), 1, "", data)
+        self.write_event(time.monotonic(), 1, "", data)

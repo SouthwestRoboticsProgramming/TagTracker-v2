@@ -15,7 +15,7 @@ class CameraParams:
 
 @dataclass(order=True)
 class CameraFrame:
-    timestamp: float
+    timestamp: float # Based on time.monotonic()
     camera: str
     calibration: config.CalibrationInfo
     image: cv2.Mat = field(compare=False)
@@ -53,7 +53,7 @@ class CameraInputThread(threading.Thread):
         self.current_config = None
         self.running = True
 
-    def next_frame(self) -> tuple[bool, cv2.Mat]:
+    def next_frame(self) -> tuple[bool, cv2.Mat, float]:
         config = self.nt.get_config_params()
         if is_config_different(self.current_config, config) and self.capture != None:
             print(self.settings.name, "stopping capture")
@@ -77,18 +77,22 @@ class CameraInputThread(threading.Thread):
             print(self.settings.name, "applied config:", config)
 
         if self.capture is None:
-            return (False, None)
+            return (False, None, None)
         else:
-            ret = self.capture.read()
-            if not ret[0]:
+            ret, image = self.capture.read()
+            if not ret:
                 print(self.settings.name, "did not receive image")
-            return ret
+                return (False, None, None)
+            
+            # V4L2 frame timestamp for time at which frame was captured
+            # It binds to CLOCK_MONOTONIC (= time.monotonic())
+            timestamp = self.capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            return (True, image, timestamp)
 
     def run(self):
         print(self.settings.name, "starting capture thread")
         while self.running:
-            timestamp = time.time()
-            retval, image = self.next_frame()
+            retval, image, timestamp = self.next_frame()
             if retval:
                 self.count += 1
                 # Use while in case a frame took over 1 second

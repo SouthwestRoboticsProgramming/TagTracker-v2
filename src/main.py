@@ -77,7 +77,7 @@ def main():
                 cv2.putText(frame.image, text, pos, cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
             put_text("Frame queue: " + str(frame_queue.qsize()), (5, top), (64, 128, 255))
             put_text("Result queue: " + str(result_queue.qsize()), (5, top + 40), (64, 128, 255))
-            put_text(f"Frame age: {(time.time() - frame.timestamp) :.3f}", (5, top + 80), (64, 128, 255))
+            put_text(f"Frame age: {(time.monotonic() - frame.timestamp) :.3f}", (5, top + 80), (64, 128, 255))
 
             nt.publish_output(result)
             stream.publish_frame(frame.camera, frame.image)
