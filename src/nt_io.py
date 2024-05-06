@@ -53,6 +53,9 @@ class CameraNetworkTablesIO:
         self.fps_pub = output_table.getDoubleTopic("fps").publish()
         self.resolution_pub = output_table.getIntegerArrayTopic("resolution").publish()
         self.first_frame_filename_pub = output_table.getStringTopic("first_frame_filename").publish()
+        self.alive_pub = output_table.getBooleanTopic("alive").publish()
+        
+        self.alive_pub.set(False)
 
     def get_config_params(self) -> capture.CameraParams:
         if not self.inst.isConnected():
@@ -70,6 +73,9 @@ class CameraNetworkTablesIO:
 
     def publish_first_frame_filename(self, filename: str):
         self.first_frame_filename_pub.set(filename)
+
+    def publish_alive(self, alive: bool):
+        self.alive_pub.set(alive)
 
     def publish_output(self, result: process.FrameResult):
         est = result.estimates

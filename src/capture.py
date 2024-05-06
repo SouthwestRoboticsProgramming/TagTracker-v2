@@ -81,11 +81,13 @@ class CameraInputThread(threading.Thread):
             capture_is_new = True
 
         if self.capture is None:
+            self.nt.publish_alive(False)
             return (False, None, None)
         else:
             ret, image = self.capture.read()
             if not ret:
                 print(self.settings.name, "did not receive image")
+                self.nt.publish_alive(False)
                 return (False, None, None)
             
             # V4L2 frame timestamp for time at which frame was captured
@@ -100,6 +102,7 @@ class CameraInputThread(threading.Thread):
                 print(self.settings.name, "saved frame to", filename)
                 self.nt.publish_first_frame_filename(filename)
 
+            self.nt.publish_alive(True)
             return (True, image, timestamp)
 
     def run(self):
