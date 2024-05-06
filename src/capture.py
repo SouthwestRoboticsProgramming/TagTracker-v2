@@ -98,6 +98,7 @@ class CameraInputThread(threading.Thread):
                 filename = f"{out_dir}first_frame_{uid}.png"
                 cv2.imwrite(filename, image)
                 print(self.settings.name, "saved frame to", filename)
+                self.nt.publish_first_frame_filename(filename)
 
             return (True, image, timestamp)
 

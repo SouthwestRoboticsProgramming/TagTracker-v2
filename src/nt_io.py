@@ -52,6 +52,7 @@ class CameraNetworkTablesIO:
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
         self.fps_pub = output_table.getDoubleTopic("fps").publish()
         self.resolution_pub = output_table.getIntegerArrayTopic("resolution").publish()
+        self.first_frame_filename_pub = output_table.getStringTopic("first_frame_filename").publish()
 
     def get_config_params(self) -> capture.CameraParams:
         if not self.inst.isConnected():
@@ -66,6 +67,9 @@ class CameraNetworkTablesIO:
 
     def publish_image_resolution(self, width: int, height: int):
         self.resolution_pub.set([width, height])
+
+    def publish_first_frame_filename(self, filename: str):
+        self.first_frame_filename_pub.set(filename)
 
     def publish_output(self, result: process.FrameResult):
         est = result.estimates
