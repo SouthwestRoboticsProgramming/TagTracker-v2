@@ -47,6 +47,8 @@ def main():
     threads = []
     for camera_config in conf.cameras:
         io = nt.get_camera_io(camera_config.name)
+        res = camera_config.calibration.resolution
+        io.publish_image_resolution(int(res[0]), int(res[1]))
         threads.append(capture.CameraInputThread(camera_config, frame_queue, io))
 
     for _ in range(0, conf.process_threads):
