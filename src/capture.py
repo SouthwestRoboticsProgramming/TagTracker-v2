@@ -17,7 +17,7 @@ class CameraParams:
 class CameraFrame:
     timestamp: float # Based on time.monotonic()
     camera: str
-    calibration: config.CalibrationInfo
+    calibration: config.CalibrationInfo = field(compare=False)
     image: cv2.Mat = field(compare=False)
     rate: int = field(compare=False)
 

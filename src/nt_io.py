@@ -1,5 +1,5 @@
-import math
 import ntcore
+import struct
 import time
 from dataclasses import dataclass
 from wpimath.geometry import *
@@ -25,12 +25,19 @@ def append_pose(pose_data: list[float], pose: Pose3d):
         tx.X(), tx.Y(), tx.Z(),
         q.W(), q.X(), q.Y(), q.Z()
     ])
-
-def append_estimate(pose_data: list[float], est: tuple[Pose3d, float]):
+    
+def pack_estimate(est: tuple[Pose3d, float]) -> bytes:
     pose, err = est
 
-    pose_data.append(err)
-    append_pose(pose_data, pose)
+    tx = pose.translation()
+    q = pose.rotation().getQuaternion()
+
+    return struct.pack(
+        ">fddddddd",
+        err,
+        tx.X(), tx.Y(), tx.Z(),
+        q.W(), q.X(), q.Y(), q.Z()
+    )
 
 class CameraNetworkTablesIO:
     def __init__(self, camera: str):
@@ -39,13 +46,9 @@ class CameraNetworkTablesIO:
 
         self.config_table = table.getSubTable("Config")
 
-        opt = ntcore.PubSubOptions()
-        opt.sendAll = True
-
-        self.exposure_sub = self.config_table.getDoubleTopic("Exposure").subscribe(31.0, opt)
-
         output_table = table.getSubTable("Outputs")
-        self.poses_pub = output_table.getDoubleArrayTopic("poses").publish(
+        self.poses_pub = output_table.getRawTopic("poses").publish(
+            "raw",
             ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
         self.fps_pub = output_table.getDoubleTopic("fps").publish()
 
@@ -63,20 +66,34 @@ class CameraNetworkTablesIO:
     def publish_output(self, result: process.FrameResult):
         est = result.estimates
 
-        # Collect the pose data into an array
-        pose_data = [0]
         if est:
-            pose_data[0] = 1
-            append_estimate(pose_data, est.pose_a)
+            pose_data = struct.pack(">?", True)
+            pose_data += pack_estimate(est.pose_a)
             if est.pose_b is not None:
-                pose_data[0] = 2
-                append_estimate(pose_data, est.pose_b)
+                pose_data += struct.pack(">?", True)
+                pose_data += pack_estimate(est.pose_b)
+                pose_data += struct.pack(">B", len(result.detections))
+            else:
+                pose_data += struct.pack(">?", False)
+                # Length not needed, guaranteed to be exactly one tag
             for detection in result.detections:
-                pose_data.append(detection.id)
+                corners = detection.corners
+                pose_data += struct.pack(
+                    ">BHHHHHHHH",
+                    detection.id,
+
+                    # Send the corners for visualization in AdvantageScope
+                    round(corners[0][0]), round(corners[0][1]),
+                    round(corners[1][0]), round(corners[1][1]),
+                    round(corners[2][0]), round(corners[2][1]),
+                    round(corners[3][0]), round(corners[3][1])
+                )
+        else:
+            pose_data = struct.pack(">?", False)
 
         # Send it
         # Send how long it took to process the frame for latency correction
-        pose_data.append(time.monotonic() - result.frame.timestamp)
+        pose_data += struct.pack(">d", time.monotonic() - result.frame.timestamp)
         self.poses_pub.set(pose_data)
         self.fps_pub.set(result.frame.rate)
 
