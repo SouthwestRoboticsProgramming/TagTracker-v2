@@ -34,6 +34,11 @@ class NetworkTablesConfig:
     identity: str
 
 @dataclass
+class FrameDebugConfig:
+    enabled: bool
+    output_dir: str
+
+@dataclass
 class StreamConfig:
     port: int
 
@@ -49,6 +54,7 @@ class TagTrackerConfig:
     tag_family: str
     process_threads: int
     cameras: list[CameraSettings]
+    frame_debug: FrameDebugConfig
     stream: StreamConfig
     logging: LoggingConfig
 
@@ -121,6 +127,7 @@ def load_config(file_name: str) -> TagTrackerConfig:
         json_obj = json.load(json_file)
 
     nt_obj = json_obj["networktables"]
+    frame_debug_obj = json_obj["frame-debug"]
     stream_obj = json_obj["web-stream"]
     logging_obj = json_obj["logging"]
 
@@ -141,6 +148,10 @@ def load_config(file_name: str) -> TagTrackerConfig:
         tag_family=json_obj["tag-family"],
         process_threads=json_obj["process-threads"],
         cameras=cameras,
+        frame_debug=FrameDebugConfig(
+            enabled=frame_debug_obj["enabled"],
+            output_dir=frame_debug_obj["output-dir"]
+        ),
         stream=StreamConfig(
             port=stream_obj["port"]
         ),

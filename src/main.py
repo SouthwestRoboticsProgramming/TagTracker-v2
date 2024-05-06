@@ -49,7 +49,7 @@ def main():
         io = nt.get_camera_io(camera_config.name)
         res = camera_config.calibration.resolution
         io.publish_image_resolution(int(res[0]), int(res[1]))
-        threads.append(capture.CameraInputThread(camera_config, frame_queue, io))
+        threads.append(capture.CameraInputThread(camera_config, conf.frame_debug, frame_queue, io))
 
     for _ in range(0, conf.process_threads):
         threads.append(process.TagProcessThread(dict, conf.environment, frame_queue, result_queue))

@@ -2,6 +2,7 @@ import cv2
 import threading
 import time
 import queue
+import random
 from dataclasses import dataclass, field
 
 import config
@@ -39,7 +40,7 @@ class CameraInputThread(threading.Thread):
     running: bool
 
     # nt is CameraNetworkTablesIO
-    def __init__(self, settings: config.CameraSettings, frame_queue: queue.PriorityQueue[CameraFrame], nt):
+    def __init__(self, settings: config.CameraSettings, frame_debug_conf: config.FrameDebugConfig, frame_queue: queue.PriorityQueue[CameraFrame], nt):
         threading.Thread.__init__(self)
         self.settings = settings
         self.nt = nt
@@ -52,6 +53,7 @@ class CameraInputThread(threading.Thread):
         self.capture = None
         self.current_config = None
         self.running = True
+        self.frame_debug_conf = frame_debug_conf
 
     def next_frame(self) -> tuple[bool, cv2.Mat, float]:
         config = self.nt.get_config_params()
@@ -60,6 +62,7 @@ class CameraInputThread(threading.Thread):
             self.capture.release()
             self.capture = None
         
+        capture_is_new = False
         if self.capture is None and config != None:
             print(self.settings.name, "opening capture")
             self.capture = cv2.VideoCapture(self.settings.id, cv2.CAP_V4L2)
@@ -75,6 +78,7 @@ class CameraInputThread(threading.Thread):
 
             self.current_config = config
             print(self.settings.name, "applied config:", config)
+            capture_is_new = True
 
         if self.capture is None:
             return (False, None, None)
@@ -87,6 +91,14 @@ class CameraInputThread(threading.Thread):
             # V4L2 frame timestamp for time at which frame was captured
             # It binds to CLOCK_MONOTONIC (= time.monotonic())
             timestamp = self.capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+
+            if capture_is_new and self.frame_debug_conf.enabled:
+                out_dir = self.frame_debug_conf.output_dir
+                uid = random.randint(0, 1000000000)
+                filename = f"{out_dir}first_frame_{uid}.png"
+                cv2.imwrite(filename, image)
+                print(self.settings.name, "saved frame to", filename)
+
             return (True, image, timestamp)
 
     def run(self):

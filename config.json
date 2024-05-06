@@ -1,5 +1,5 @@
 {
-    "environment": "environment.json",
+    "environment": "crescendo_field.json",
     "networktables": {
         "server-ip": "localhost",
         "identity": "TagTracker-v2"
@@ -8,19 +8,20 @@
     "process-threads": 10,
     "cameras": [
         {
-            "id": 2,
-            "name": "usb1",
-            "auto-exposure": 1,
-            "exposure": 25,
-            "gain": 25,
-            "calibration": "calibrations/arducam.json"
+            "id": 0,
+            "name": "webcam",
+            "calibration": "calibrations/hp_probook_11_g2_webcam.json"
         }
     ],
+    "frame-debug": {
+        "enabled": true,
+        "output-dir": "frames/"
+    },
     "web-stream": {
         "port": 8000
     },
     "logging": {
-        "enabled": true,
+        "enabled": false,
         "output-dir": "./"
     }
 }
