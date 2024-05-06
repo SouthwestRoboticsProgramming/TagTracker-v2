@@ -54,6 +54,7 @@ class CameraInputThread(threading.Thread):
         self.current_config = None
         self.running = True
         self.frame_debug_conf = frame_debug_conf
+        self.has_printed_error = False
 
     def next_frame(self) -> tuple[bool, cv2.Mat, float]:
         config = self.nt.get_config_params()
@@ -86,7 +87,9 @@ class CameraInputThread(threading.Thread):
         else:
             ret, image = self.capture.read()
             if not ret:
-                print(self.settings.name, "did not receive image")
+                if not self.has_printed_error:
+                    print(self.settings.name, "did not receive image")
+                    self.has_printed_error = True
                 self.nt.publish_alive(False)
                 return (False, None, None)
             
@@ -103,6 +106,7 @@ class CameraInputThread(threading.Thread):
                 self.nt.publish_first_frame_filename(filename)
 
             self.nt.publish_alive(True)
+            self.has_printed_error = False
             return (True, image, timestamp)
 
     def run(self):
@@ -116,7 +120,6 @@ class CameraInputThread(threading.Thread):
                     self.fps = self.count
                     self.count = 0
                     self.prev_time += 1
-                    print(self.settings.name, "fps:", self.fps)
 
                 self.frame_queue.put(CameraFrame(
                     timestamp=timestamp,
