@@ -112,5 +112,6 @@ class CameraInputThread(threading.Thread):
             else:
                 time.sleep(1)
 
-        self.capture.release()
+        if self.capture is not None:
+            self.capture.release()
         print(self.settings.name, "stopped capture thread")
