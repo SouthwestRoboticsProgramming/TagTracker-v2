@@ -91,7 +91,7 @@ class CameraNetworkTablesIO:
                 pose_data += struct.pack(">?", False)
                 # Length not needed, guaranteed to be exactly one tag
             for detection in result.detections:
-                corners = detection.corners
+                corners = detection.corners[0]
                 pose_data += struct.pack(
                     ">BHHHHHHHH",
                     detection.id,
@@ -115,22 +115,17 @@ class NetworkTablesIO:
     cameras: dict[str, CameraNetworkTablesIO]
     fms: ntcore.NetworkTable
 
-    def __init__(self, conf: config.NetworkTablesConfig, env: config.TagEnvironment):
+    def __init__(self, conf: config.NetworkTablesConfig):
         self.cameras = {}
 
         nt = ntcore.NetworkTableInstance.getDefault()
         nt.setServer(conf.server_ip)
         nt.startClient4(conf.identity)
 
-        # Publish the tag environment so ShuffleLog can visualize it
-        self.env_pub = nt.getDoubleArrayTopic("/TagTracker/environment").publish()
-        env_data = []
-        for id, pose in env.tags.items():
-            env_data.append(id)
-            append_pose(env_data, pose)
-        self.env_pub.set(env_data)
+        table = nt.getTable("/TagTracker")
+        self.env_entry = table.getEntry("Environment")
 
-        self.fms = nt.getTable("FMSInfo")
+        self.prev_env_change = None
 
     def get_camera_io(self, cam_name: str) -> CameraNetworkTablesIO:
         if not cam_name in self.cameras:
@@ -154,3 +149,36 @@ class NetworkTablesIO:
             is_red=self.fms.getBoolean("IsRedAlliance", False),
             station_num=self.fms.getEntry("StationNumber").getInteger(999999)
         )
+    
+    # Modifies the contents of env
+    def refresh_environment(self, env: config.TagEnvironment):
+        # Skip if no change
+        last_change = self.env_entry.getLastChange()
+        if last_change == self.prev_env_change:
+            return
+        self.prev_env_change = last_change
+
+        print("Updating tag environment")
+        data = self.env_entry.getDoubleArray([])
+        if len(data) == 0:
+            return
+
+        env.tag_size = data[0]
+        env.tags = {}
+
+        for i in range(1, len(data), 8):
+            tag_id = int(data[i])
+
+            tx = data[i + 1]
+            ty = data[i + 2]
+            tz = data[i + 3]
+            qw = data[i + 4]
+            qx = data[i + 5]
+            qy = data[i + 6]
+            qz = data[i + 7]
+
+            translation = Translation3d(tx, ty, tz)
+            rotation = Rotation3d(Quaternion(qw, qx, qy, qz))
+            pose = Pose3d(translation, rotation)
+
+            env.tags[tag_id] = pose

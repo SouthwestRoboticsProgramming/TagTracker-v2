@@ -49,7 +49,6 @@ class LoggingConfig:
 
 @dataclass
 class TagTrackerConfig:
-    environment: TagEnvironment
     networktables: NetworkTablesConfig
     tag_family: str
     process_threads: int
@@ -77,50 +76,6 @@ def load_calibration(file_name: str) -> CalibrationInfo:
         matrix=mtx,
         distortion_coeffs=dist
     )
-
-def load_environment(file_name: str) -> TagEnvironment:
-    with open(file_name, 'r') as json_file:
-        json_obj = json.load(json_file)
-
-    tags = {}
-    tag_size = json_obj["tag_size"]
-    json_tags = json_obj["tags"]
-    for json_tag in json_tags:
-        id = json_tag["ID"]
-
-        json_pose = json_tag["pose"]
-        json_translation = json_pose["translation"]
-        tx = json_translation["x"]
-        ty = json_translation["y"]
-        tz = json_translation["z"]
-
-        json_rotation = json_pose["rotation"]
-
-        if "euler" in json_rotation:
-            json_euler = json_rotation["euler"]
-            rx = math.radians(json_euler["X"])
-            ry = math.radians(json_euler["Y"])
-            rz = math.radians(json_euler["Z"])
-            rotation = Rotation3d(rx, ry, rz)
-        else:
-            json_quat = json_rotation["quaternion"]
-            qw = json_quat["W"]
-            qx = json_quat["X"]
-            qy = json_quat["Y"]
-            qz = json_quat["Z"]
-            rotation = Rotation3d(Quaternion(qw, qx, qy, qz))
-
-        pose = Pose3d(
-            Translation3d(tx, ty, tz),
-            rotation
-        )
-
-        tags[id] = pose
-
-    return TagEnvironment(
-        tag_size=tag_size,
-        tags=tags
-    )
     
 def load_config(file_name: str) -> TagTrackerConfig:
     with open(file_name, 'r') as json_file:
@@ -140,7 +95,6 @@ def load_config(file_name: str) -> TagTrackerConfig:
         ))
 
     return TagTrackerConfig(
-        environment=load_environment(json_obj["environment"]),
         networktables=NetworkTablesConfig(
             server_ip=nt_obj["server-ip"],
             identity=nt_obj["identity"]

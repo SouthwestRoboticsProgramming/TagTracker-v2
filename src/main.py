@@ -39,7 +39,8 @@ def main():
         return
 
     # Connect to NetworkTables server
-    nt = nt_io.NetworkTablesIO(conf.networktables, conf.environment)
+    tag_env = config.TagEnvironment(0.1, {}) # Empty environment, real environment comes from robot code
+    nt = nt_io.NetworkTablesIO(conf.networktables)
 
     frame_queue = queue.PriorityQueue()
     result_queue = queue.PriorityQueue()
@@ -52,7 +53,7 @@ def main():
         threads.append(capture.CameraInputThread(camera_config, conf.frame_debug, frame_queue, io))
 
     for _ in range(0, conf.process_threads):
-        threads.append(process.TagProcessThread(dict, conf.environment, frame_queue, result_queue))
+        threads.append(process.TagProcessThread(dict, tag_env, frame_queue, result_queue))
 
     stream = web_stream.StreamServer(conf.stream)
     stream.start()
@@ -93,6 +94,8 @@ def main():
                 
                 if len(result.detections) != 0:
                     logger.log_tag_detects(frame.timestamp, frame.camera, result.detections)
+
+            nt.refresh_environment(tag_env)
 
             if args.gui:
                 cv2.imshow(frame.camera, frame.image)
